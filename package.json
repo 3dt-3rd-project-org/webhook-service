@@ -1,0 +1,20 @@
+{
+  "name": "readpoint-webhook-service",
+  "version": "1.0.0",
+  "description": "ADF 및 Functions 완료 이벤트를 Web PubSub으로 중계하는 마이크로서비스",
+  "main": "src/functions/*.js",
+  "type": "module",
+  "scripts": {
+    "start": "func start --port 7071",
+    "test": "echo \"No tests defined\""
+  },
+  "dependencies": {
+    "@azure/functions": "^4.1.0",
+    "@azure/web-pubsub": "^1.1.1",
+    "pg": "^8.12.0",
+    "winston": "^3.13.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
