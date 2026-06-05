@@ -1,0 +1,84 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "ReadPoint Webhook Service API",
+    "description": "ADF 진행률 웹훅 및 메타데이터 파싱 완료 수신용 API 명세",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://<your-webhook-service-function-app>.azurewebsites.net/api",
+      "description": "배포된 Webhook Service Azure Function App 주소"
+    }
+  ],
+  "paths": {
+    "/webhook/adf-progress": {
+      "post": {
+        "summary": "ADF 파이프라인 진행률 웹훅 수신",
+        "description": "Azure Data Factory 파이프라인 진행 상태 수신 및 실시간 모니터링 그룹 브로드캐스트",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "book_id": { "type": "integer" },
+                  "progress": { "type": "integer" }
+                },
+                "required": ["book_id", "progress"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "웹훅 처리 성공"
+          },
+          "400": {
+            "description": "필수 필드 누락"
+          },
+          "500": {
+            "description": "서버 내부 오류"
+          }
+        }
+      }
+    },
+    "/webhook/metadata": {
+      "post": {
+        "summary": "메타데이터 처리 결과 웹훅 수신",
+        "description": "Azure Functions의 epub 메타데이터 파싱 완료 또는 에러 이벤트를 수신합니다.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "books_id": { "type": "integer" },
+                  "book_id": { "type": "integer" },
+                  "event": { "type": "string" },
+                  "error": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "웹훅 처리 성공"
+          },
+          "400": {
+            "description": "파라미터 누락"
+          },
+          "404": {
+            "description": "해당 도서 미존재"
+          },
+          "500": {
+            "description": "서버 내부 오류"
+          }
+        }
+      }
+    }
+  }
+}
