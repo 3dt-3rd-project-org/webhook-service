@@ -2,6 +2,7 @@ import { app } from '@azure/functions';
 import { WebPubSubServiceClient } from '@azure/web-pubsub';
 import { dbPool } from '../config/db.js';
 import { logger } from '../utils/logger.js';
+import { handleSuccess, handleError } from '../shared/responseHelper.js';
 
 const wpsConnectionString = process.env.AZURE_WEB_PUBSUB_CONNECTION_STRING;
 const wpsHub = process.env.AZURE_WEB_PUBSUB_HUB;
@@ -38,15 +39,6 @@ app.http('handleAdfProgress', {
 
       logger.info(`[Webhook] 진행률 수신 - Book ID: ${bookId}, Progress: ${progNum}%`);
 
-      if (wpsClient) {
-        try {
-          await wpsClient.sendToGroup(`book_${bookId}`, JSON.stringify({ progress: progNum }));
-          logger.info(`[Web PubSub Publish] Book ${bookId} 진행률 배달 성공: ${progNum}%`);
-        } catch (wpsErr) {
-          logger.error(`[Web PubSub Publish Warning] 실시간 브로드캐스트 실패: ${wpsErr.message}`);
-        }
-      }
-
       if (progNum === 100) {
         logger.info(`[Webhook] Book ${bookId} 분석 100% 완료. PostgreSQL 상태 업데이트 수행.`);
         await dbPool.query(
@@ -55,22 +47,34 @@ app.http('handleAdfProgress', {
         );
       }
 
-      return {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: '진행 상태 웹훅 처리가 성공적으로 수행되었습니다.',
-          book_id: bookId,
-          progress: progNum
-        })
-      };
+      // DB에서 admin_id 조회하여 관리자 고유 채널로 이벤트 브로드캐스트
+      const bookRes = await dbPool.query('SELECT admin_id FROM books WHERE books_id = $1', [bookId]);
+      if (bookRes.rows.length > 0) {
+        const adminId = bookRes.rows[0].admin_id;
+
+        if (wpsClient) {
+          try {
+            await wpsClient.group(`admin_${adminId}`).sendToAll({
+              event: 'PROGRESS',
+              book_id: bookId,
+              progress: progNum
+            });
+            logger.info(`[Web PubSub Publish] 관리자 ${adminId} 채널에 Book ${bookId} 진행률 배달 성공: ${progNum}%`);
+          } catch (wpsErr) {
+            logger.error(`[Web PubSub Publish Warning] 실시간 브로드캐스트 실패: ${wpsErr.message}`);
+          }
+        }
+      } else {
+        logger.warn(`[Webhook Warning] Book ID ${bookId}에 해당하는 도서 정보를 조회할 수 없어 실시간 알림을 생략합니다.`);
+      }
+
+      return handleSuccess({
+        message: '진행 상태 웹훅 처리가 성공적으로 수행되었습니다.',
+        book_id: bookId,
+        progress: progNum
+      });
     } catch (err) {
-      logger.error(`[Webhook Progress Handler] 오류: ${err.message}`);
-      return {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ error: 'Internal Server Error', message: err.message })
-      };
+      return handleError(err, logger, 'Webhook Progress Handler');
     }
   }
 });
@@ -124,32 +128,23 @@ app.http('handleMetadataComplete', {
 
       if (wpsClient) {
         try {
-          await wpsClient.sendToGroup(`book_${bookId}`, JSON.stringify({
+          await wpsClient.group(`admin_${updatedBook.admin_id}`).sendToAll({
             event: eventType === 'error' ? 'METADATA_ERROR' : 'METADATA_COMPLETE',
             book: updatedBook,
             error: reqBody.error || null
-          }));
-          logger.info(`[Web PubSub Publish] Book ${bookId} 메타데이터 결과 이벤트 전송 완료.`);
+          });
+          logger.info(`[Web PubSub Publish] 관리자 ${updatedBook.admin_id} 채널에 Book ${bookId} 메타데이터 결과 이벤트 전송 완료.`);
         } catch (wpsErr) {
           logger.error(`[Web PubSub Publish Warning] 실시간 브로드캐스트 실패: ${wpsErr.message}`);
         }
       }
 
-      return {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: '도서 메타데이터 웹훅 처리를 성공적으로 완료했습니다.',
-          book: updatedBook
-        })
-      };
+      return handleSuccess({
+        message: '도서 메타데이터 웹훅 처리를 성공적으로 완료했습니다.',
+        book: updatedBook
+      });
     } catch (err) {
-      logger.error(`[Webhook Metadata Handler] 오류: ${err.message}`);
-      return {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ error: 'Internal Server Error', message: err.message })
-      };
+      return handleError(err, logger, 'Webhook Metadata Handler');
     }
   }
 });
