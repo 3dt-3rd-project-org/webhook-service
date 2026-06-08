@@ -106,3 +106,74 @@ app.http('handlePipelineWebhook', {
     }
   }
 });
+
+app.http('handleMetadataComplete', {
+  methods: ['POST'],
+  authLevel: 'anonymous',
+  route: 'webhook/metadata',
+  handler: async (request, context) => {
+    logger.info('[Webhook Metadata Handler] Functions 메타데이터 완료 웹훅 요청 접수');
+    try {
+      const reqBody = await request.json();
+      const bookIdRaw = reqBody.books_id !== undefined ? reqBody.books_id : reqBody.book_id;
+      const eventType = reqBody.event || 'metadata_done';
+
+      if (bookIdRaw === undefined || bookIdRaw === null) {
+        if (eventType === 'error') {
+          logger.error(`[Webhook Metadata Error] 파이프라인에서 메타데이터 파싱 에러 수신: ${reqBody.error || '알 수 없는 오류'}`);
+          return {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: '에러 웹훅 수신 및 로깅 완료' })
+          };
+        }
+
+        return {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ error: 'Bad Request', message: 'books_id 또는 book_id 필드는 필수입니다.' })
+        };
+      }
+
+      const bookId = parseInt(bookIdRaw, 10);
+      logger.info(`[Webhook] Azure Functions 메타데이터 작업 결과 수신 - Book ID: ${bookId}, Event: ${eventType}`);
+
+      const result = await dbPool.query(
+        `SELECT * FROM books WHERE books_id = $1`,
+        [bookId]
+      );
+
+      if (result.rows.length === 0) {
+        return {
+          status: 404,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ error: 'Not Found', message: '해당 도서를 찾을 수 없습니다.' })
+        };
+      }
+
+      const updatedBook = result.rows[0];
+      logger.info(`[Webhook] Azure Functions가 DB에 직접 갱신한 최신 도서 정보 로드 완료 (제목: ${updatedBook.title})`);
+
+      if (wpsClient) {
+        try {
+          await wpsClient.group(`admin_${updatedBook.admin_id}`).sendToAll({
+            event: eventType === 'error' ? 'METADATA_ERROR' : 'METADATA_COMPLETE',
+            book: updatedBook,
+            error: reqBody.error || null
+          });
+          logger.info(`[Web PubSub Publish] 관리자 ${updatedBook.admin_id} 채널에 Book ${bookId} 메타데이터 결과 이벤트 전송 완료.`);
+        } catch (wpsErr) {
+          logger.error(`[Web PubSub Publish Warning] 실시간 브로드캐스트 실패: ${wpsErr.message}`);
+        }
+      }
+
+      return handleSuccess({
+        message: '도서 메타데이터 웹훅 처리를 성공적으로 완료했습니다.',
+        book: updatedBook
+      });
+    } catch (err) {
+      return handleError(err, logger, 'Webhook Metadata Handler');
+    }
+  }
+});
+
