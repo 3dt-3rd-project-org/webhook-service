@@ -76,10 +76,10 @@ app.http('handlePipelineWebhook', {
           let eventType;
 
           if (type === 'success' && step === 'dag1_complete') {
-            eventType = 'METADATA_COMPLETE';
+            eventType = 'COMPLETE';
             eventPayload.book = updatedBook;
           } else if (type === 'error') {
-            eventType = 'METADATA_ERROR';
+            eventType = 'ERROR';
             eventPayload.error = error || null;
           } else {
             // 진행률(progress) 이벤트 처리
