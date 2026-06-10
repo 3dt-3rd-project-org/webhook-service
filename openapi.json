@@ -44,6 +44,45 @@
         }
       }
     },
+    "/webhook/summary": {
+      "post": {
+        "summary": "요약 파이프라인 이벤트 웹훅 수신",
+        "description": "ADF 요약 생성 파이프라인의 에러, 진행 중, 성공 이벤트를 수신하여 처리합니다.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "books_id": { "type": "string", "description": "도서 식별자" },
+                  "type": { "type": "string", "enum": ["progress", "success", "error"] },
+                  "step": { "type": "string", "description": "파이프라인 세부 단계 (예: summary_complete)" },
+                  "progress": { "type": "integer", "description": "진행률 (0-100)" },
+                  "message": { "type": "string", "description": "진행 상태 메시지" },
+                  "error": { "type": "string", "description": "에러 발생 시 에러 메시지" }
+                },
+                "required": ["books_id", "type"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "요약 웹훅 처리 성공"
+          },
+          "400": {
+            "description": "필수 파라미터 누락"
+          },
+          "404": {
+            "description": "도서 정보 없음"
+          },
+          "500": {
+            "description": "서버 내부 오류"
+          }
+        }
+      }
+    },
     "/webhook/metadata": {
       "post": {
         "summary": "메타데이터 처리 결과 웹훅 수신",
