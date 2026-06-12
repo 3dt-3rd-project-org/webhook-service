@@ -83,7 +83,7 @@ app.http('handlePipelineWebhook', {
             eventPayload.error = error || null;
           } else {
             // 진행률(progress) 이벤트 처리
-            eventType = 'ANALYZING_PROGRESS';
+            eventType = 'ANALYZING';
             eventPayload.progress = progress !== undefined ? parseInt(progress, 10) : 0;
           }
 

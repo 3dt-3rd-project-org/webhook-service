@@ -12,10 +12,10 @@
     }
   ],
   "paths": {
-    "/webhook/adf-progress": {
+    "/webhook/pipeline": {
       "post": {
-        "summary": "ADF 파이프라인 진행률 웹훅 수신",
-        "description": "Azure Data Factory 파이프라인 진행 상태 수신 및 실시간 모니터링 그룹 브로드캐스트",
+        "summary": "ADF 분석 파이프라인 진행률 및 완료 웹훅 수신",
+        "description": "Azure Data Factory 파이프라인 진행 상태 수신, DB 도서 상태 업데이트 및 실시간 모니터링 그룹 브로드캐스트",
         "requestBody": {
           "required": true,
           "content": {
@@ -23,10 +23,14 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "book_id": { "type": "integer" },
-                  "progress": { "type": "integer" }
+                  "books_id": { "type": "string", "description": "도서 식별자" },
+                  "type": { "type": "string", "enum": ["progress", "success", "error"], "description": "이벤트 타입" },
+                  "step": { "type": "string", "description": "파이프라인 세부 단계" },
+                  "progress": { "type": "integer", "description": "진행률 (0-100)" },
+                  "message": { "type": "string", "description": "진행 상태 메시지" },
+                  "error": { "type": "string", "description": "에러 발생 시 에러 메시지" }
                 },
-                "required": ["book_id", "progress"]
+                "required": ["books_id"]
               }
             }
           }
