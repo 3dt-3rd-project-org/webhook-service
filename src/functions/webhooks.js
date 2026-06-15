@@ -16,6 +16,7 @@ if (wpsConnectionString && wpsHub) {
   }
 }
 
+// 1. ADF 통합 파이프라인(분석) 웹훅
 app.http('handlePipelineWebhook', {
   methods: ['POST'],
   authLevel: 'anonymous',
@@ -107,6 +108,7 @@ app.http('handlePipelineWebhook', {
   }
 });
 
+// 2. Functions 메타데이터 완료 웹훅
 app.http('handleMetadataComplete', {
   methods: ['POST'],
   authLevel: 'anonymous',
@@ -177,6 +179,7 @@ app.http('handleMetadataComplete', {
   }
 });
 
+// 3. ADF 요약 생성 파이프라인 웹훅
 app.http('handleSummaryWebhook', {
   methods: ['POST'],
   authLevel: 'anonymous',
@@ -267,4 +270,3 @@ app.http('handleSummaryWebhook', {
     }
   }
 });
-
