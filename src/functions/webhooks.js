@@ -119,14 +119,29 @@ app.http('handleMetadataComplete', {
       const reqBody = await request.json();
       const bookIdRaw = reqBody.books_id !== undefined ? reqBody.books_id : reqBody.book_id;
       const eventType = reqBody.event || 'metadata_done';
+      const adminIdRaw = reqBody.admin_id;
 
       if (bookIdRaw === undefined || bookIdRaw === null) {
         if (eventType === 'error') {
           logger.error(`[Webhook Metadata Error] 파이프라인에서 메타데이터 파싱 에러 수신: ${reqBody.error || '알 수 없는 오류'}`);
+          
+          if (wpsClient && adminIdRaw) {
+            try {
+              await wpsClient.group(`admin_${adminIdRaw}`).sendToAll({
+                status: 'METADATA_ERROR',
+                book: null,
+                error: reqBody.error || '메타데이터 분석 중 오류가 발생했습니다.'
+              });
+              logger.info(`[Web PubSub Publish] 관리자 ${adminIdRaw} 채널에 에러 이벤트 전송 완료.`);
+            } catch (wpsErr) {
+              logger.error(`[Web PubSub Publish Warning] 실시간 브로드캐스트 실패: ${wpsErr.message}`);
+            }
+          }
+
           return {
             status: 200,
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: '에러 웹훅 수신 및 로깅 완료' })
+            body: JSON.stringify({ message: '에러 웹훅 수신 및 전파 완료' })
           };
         }
 
